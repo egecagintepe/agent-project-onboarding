@@ -44,3 +44,4 @@ When specific agent tools expect specialized filenames, use thin symlinks or shi
 Please refer to the authoritative project contract in [AGENTS.md](AGENTS.md) and architectural dossiers in [docs/](docs/).
 ```
 This guarantees single-source-of-truth governance across all agent environments.
+

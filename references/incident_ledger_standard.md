@@ -39,3 +39,4 @@ What panicked actions must NEVER be taken during this incident? (e.g. "Do not ru
 ## 3. Mandatory Agent Preflight Check
 
 Before modifying production infrastructure or core framework settings, the agent must check `docs/INCIDENT_RUNBOOK.md` to ensure the proposed change does not recreate a known failure pattern.
+

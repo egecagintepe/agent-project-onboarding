@@ -25,3 +25,4 @@ For complex, multi-stage engineering efforts (e.g. adding a new microservice or 
 2. **Review Phase**: Human engineer reviews and approves the schema migrations.
 3. **Implementation Phase**: Delegate mechanical component and test writing to fast code-generation agents.
 4. **Verification Phase**: Run automated integration tests in CI.
+

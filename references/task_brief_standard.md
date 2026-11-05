@@ -21,3 +21,4 @@ When delegating engineering work to an AI agent, ambiguity is the primary source
 A task brief should always clarify expected behavior when data is absent:
 - "If user has no transactions, return HTTP 200 with `[]`, do NOT throw 500 or 404."
 - "If external service times out, fall back to cached copy; do not crash the view."
+

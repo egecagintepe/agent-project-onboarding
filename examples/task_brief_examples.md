@@ -67,3 +67,4 @@ python manage.py makemigrations --check --dry-run
 python manage.py test tests.test_user_model
 ```
 ```
+

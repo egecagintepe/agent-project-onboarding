@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Agent Project Onboarding CLI Toolkit.
-Scans project repositories, scaffolds standardized 8-dossier agent handoff systems,
-and audits documentation integrity and security.
+Scans codebases, scaffolds honest 8-dossier agent handoff frameworks,
+and audits documentation integrity, links, and secret leakage.
 Standard library only (zero external dependencies).
 """
 
@@ -11,7 +11,7 @@ import json
 import os
 import re
 import sys
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 
 DOSSIER_FILES = [
     ("AGENTS.md", "Project root agent contract"),
@@ -32,16 +32,22 @@ SECRET_SCAN_PATTERNS = [
 ]
 
 def scan_project(path: str) -> Dict[str, Any]:
-    path = os.path.abspath(path)
+    path = os.path.realpath(path)
     if not os.path.isdir(path):
         raise FileNotFoundError(f"Path not found: {path}")
 
     files = []
+    top_level_dirs = set()
     for root, dirs, filenames in os.walk(path):
         # Ignore common non-source directories
         for d in [".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".next", ".astro"]:
             if d in dirs:
                 dirs.remove(d)
+
+        rel_root = os.path.relpath(root, path).replace("\\", "/")
+        if rel_root != "." and "/" not in rel_root:
+            top_level_dirs.add(rel_root)
+
         for f in filenames:
             rel = os.path.relpath(os.path.join(root, f), path).replace("\\", "/")
             files.append(rel)
@@ -50,61 +56,79 @@ def scan_project(path: str) -> Dict[str, Any]:
     frameworks = []
     databases = []
     testing_tools = []
+    evidence = []
     has_docker = False
 
-    # Detection logic
     file_set = set(files)
 
-    # Languages
+    # 1. Languages with evidence
     if any(f.endswith(".py") for f in files) or "requirements.txt" in file_set or "pyproject.toml" in file_set:
         languages.append("Python")
+        evidence.append("Python: Detected .py files or Python dependency manifests (requirements.txt / pyproject.toml)")
     if any(f.endswith((".ts", ".tsx")) for f in files) or "tsconfig.json" in file_set:
         languages.append("TypeScript")
+        evidence.append("TypeScript: Detected .ts/.tsx files or tsconfig.json")
     elif any(f.endswith((".js", ".jsx")) for f in files) or "package.json" in file_set:
         languages.append("JavaScript")
+        evidence.append("JavaScript: Detected .js/.jsx files or package.json")
     if any(f.endswith(".go") for f in files) or "go.mod" in file_set:
         languages.append("Go")
+        evidence.append("Go: Detected .go files or go.mod")
     if any(f.endswith(".rs") for f in files) or "Cargo.toml" in file_set:
         languages.append("Rust")
+        evidence.append("Rust: Detected .rs files or Cargo.toml")
     if any(f.endswith(".rb") for f in files) or "Gemfile" in file_set:
         languages.append("Ruby")
+        evidence.append("Ruby: Detected .rb files or Gemfile")
 
-    # Frameworks
+    # 2. Frameworks with evidence
     if "manage.py" in file_set:
         frameworks.append("Django")
+        evidence.append("Django: Found 'manage.py' in repository root")
+
     for f in files:
         if f.endswith((".py", ".json", ".js", ".ts", ".toml", ".txt", ".cfg", ".ini", ".env", ".yaml", ".yml")):
             try:
                 full_path = os.path.join(path, f)
                 if os.path.getsize(full_path) < 500000:
                     with open(full_path, "r", encoding="utf-8", errors="replace") as fh:
-                        content = fh.read()
-                        if "fastapi" in content.lower() and "FastAPI" not in frameworks:
+                        content = fh.read().lower()
+                        if "fastapi" in content and "FastAPI" not in frameworks:
                             frameworks.append("FastAPI")
-                        if "express" in content.lower() and "Express" not in frameworks:
+                            evidence.append(f"FastAPI: Mentioned in {f}")
+                        if "express" in content and "Express" not in frameworks:
                             frameworks.append("Express")
-                        if "next" in content.lower() and "package.json" in f and "Next.js" not in frameworks:
+                            evidence.append(f"Express: Mentioned in {f}")
+                        if "next" in content and "package.json" in f and "Next.js" not in frameworks:
                             frameworks.append("Next.js")
-                        if "react" in content.lower() and "React" not in frameworks:
+                            evidence.append(f"Next.js: Found in {f}")
+                        if "react" in content and "React" not in frameworks:
                             frameworks.append("React")
-                        if "svelte" in content.lower() and "Svelte" not in frameworks:
+                            evidence.append(f"React: Mentioned in {f}")
+                        if "svelte" in content and "Svelte" not in frameworks:
                             frameworks.append("Svelte")
-                        if ("postgresql" in content.lower() or "postgres" in content.lower() or "psycopg" in content.lower()):
-                            if "PostgreSQL" not in databases:
-                                databases.append("PostgreSQL")
-                        if "redis" in content.lower() and "Redis" not in databases:
+                            evidence.append(f"Svelte: Mentioned in {f}")
+                        if ("postgresql" in content or "postgres" in content or "psycopg" in content) and "PostgreSQL" not in databases:
+                            databases.append("PostgreSQL")
+                            evidence.append(f"PostgreSQL: Referenced in {f}")
+                        if "redis" in content and "Redis" not in databases:
                             databases.append("Redis")
-                        if "sqlite" in content.lower() and "SQLite" not in databases:
+                            evidence.append(f"Redis: Referenced in {f}")
+                        if "sqlite" in content and "SQLite" not in databases:
                             databases.append("SQLite")
-                        if "pytest" in content.lower() and "pytest" not in testing_tools:
+                            evidence.append(f"SQLite: Referenced in {f}")
+                        if "pytest" in content and "pytest" not in testing_tools:
                             testing_tools.append("pytest")
-                        if "jest" in content.lower() and "jest" not in testing_tools:
+                            evidence.append(f"pytest: Referenced in {f}")
+                        if "jest" in content and "jest" not in testing_tools:
                             testing_tools.append("jest")
+                            evidence.append(f"jest: Referenced in {f}")
             except Exception:
                 pass
 
     if any("dockerfile" in f.lower() for f in files) or any("docker-compose" in f.lower() for f in files):
         has_docker = True
+        evidence.append("Docker: Found Dockerfile or docker-compose file")
 
     # Check existing documentation
     existing_dossiers = []
@@ -119,121 +143,123 @@ def scan_project(path: str) -> Dict[str, Any]:
         "databases": databases,
         "testing_tools": testing_tools,
         "has_docker": has_docker,
+        "top_level_directories": sorted(list(top_level_dirs)),
+        "evidence": evidence,
         "existing_dossiers": existing_dossiers,
         "dossier_coverage_pct": round((len(existing_dossiers) / len(DOSSIER_FILES)) * 100, 1)
     }
 
-def generate_dossier(path: str, project_name: str = "My Project") -> List[str]:
+def generate_dossier(path: str, project_name: str = "My Project", dry_run: bool = False, force: bool = False) -> Dict[str, Any]:
+    path = os.path.realpath(path)
     scan_data = scan_project(path)
     created_files = []
+    skipped_files = []
+    file_contents = {}
 
     docs_dir = os.path.join(path, "docs")
-    os.makedirs(docs_dir, exist_ok=True)
+
+    # Format discovered top-level directories honestly
+    dirs_repr = "\n".join(f"{d}/" for d in scan_data["top_level_directories"]) if scan_data["top_level_directories"] else "docs/\n(No other top-level directories discovered yet)"
+
+    # Evidence bullet points
+    evidence_repr = "\n".join(f"- {e}" for e in scan_data["evidence"]) if scan_data["evidence"] else "- None detected automatically"
 
     # 1. AGENTS.md
     agents_md = f"""# {project_name} — Universal Agent Contract (AGENTS.md)
 
-This document is the binding operational contract for all AI coding agents (Claude, Codex, Gemini, Antigravity, Cursor) and human contributors.
+This document is the binding operational contract for all AI coding agents (Claude Code, Codex, Gemini, Antigravity, Cursor) and human contributors.
 
 ## 1. Onboarding Reading Order (Progressive Disclosure)
 
-New agents must read documentation in this strict order:
-1. `AGENTS.md` (this file — invariants & boundaries)
-2. `docs/ARCHITECTURE_MAP.md` (how the system is wired)
-3. `docs/CURRENT_STATE.md` (what is working vs broken)
+To avoid context saturation and instruction dilution, inspect documents in this order:
+1. `AGENTS.md` (this file — invariants, workspace rules & test policy)
+2. `docs/ARCHITECTURE_MAP.md` (subsystem boundaries and actual wiring)
+3. `docs/CURRENT_STATE.md` (honest ledger of what is verified vs unverified)
 4. `docs/MASTER_BACKLOG.md` (the prioritized backlog)
-5. `docs/AGENT_ROUTING.md` (which agent should perform which task)
+5. `docs/AGENT_ROUTING.md` (task assignment guidelines)
 
 ## 2. Inviolable Safety Invariants
 
-1. **No Fake Success**: Never report a task as completed using mock or synthetic test data unless explicitly requested.
-2. **Preserve Database State**: Never run destructive database commands (`DROP TABLE`, `TRUNCATE`) or `--fake` migrations.
-3. **Zero Secret Leaks**: Never print `.env` files, API tokens, passwords, or private keys in logs, transcripts, or commit messages.
+1. **No Fabricated Success**: Never report a task as completed or tested based on mock, synthetic, or unverified test results.
+2. **Preserve Database State**: Never run destructive schema modifications (`DROP TABLE`, `TRUNCATE`) or `--fake` migrations without explicit approval.
+3. **Zero Secret Exposure**: Never print `.env` files, API tokens, passwords, or private keys in logs, transcripts, or commit messages.
 4. **Git Discipline**: Never force-push (`git push --force`) to release branches.
 5. **Permanent Workspace**: Work exclusively within the project root. Never create parallel clones or disconnected workspaces.
 
 ## 3. Technology Stack & Verification Commands
 
-- **Languages**: {', '.join(scan_data['languages']) or 'General'}
-- **Frameworks**: {', '.join(scan_data['frameworks']) or 'Standard'}
-- **Databases**: {', '.join(scan_data['databases']) or 'Standard'}
-- **Testing**:
+- **Languages Detected**: {', '.join(scan_data['languages']) or 'Unverified'}
+- **Frameworks Detected**: {', '.join(scan_data['frameworks']) or 'Standard'}
+- **Databases Detected**: {', '.join(scan_data['databases']) or 'Standard'}
+- **Automated Verification**:
   ```bash
-  # Run targeted tests before committing changes
+  # Run targeted test suite before committing changes:
   {scan_data['testing_tools'][0] if scan_data['testing_tools'] else 'python -m unittest'}
   ```
 
 ## 4. Dossier Directory Map
 
 - `docs/ARCHITECTURE_MAP.md` — Subsystems, services, and cross-domain data flows.
-- `docs/CURRENT_STATE.md` — Honest feature inventory and active feature flags.
+- `docs/CURRENT_STATE.md` — Honest feature inventory, readiness statuses, and active flags.
 - `docs/MASTER_BACKLOG.md` — Prioritized backlog of engineering work items.
-- `docs/AGENT_ROUTING.md` — Model routing guidelines (which AI model handles which task).
+- `docs/AGENT_ROUTING.md` — Task allocation guidelines based on task risk profile.
 - `docs/PRODUCTION_RUNBOOK.md` — Authoritative deployment, verification, and rollback commands.
 - `docs/INCIDENT_RUNBOOK.md` — Historical production incident ledger ("Happened Once, Never Again").
 - `docs/BUILD_DEPLOY_MATRIX.md` — Impact matrix mapping changed files to required rebuild actions.
 """
-    agents_path = os.path.join(path, "AGENTS.md")
-    if not os.path.exists(agents_path):
-        with open(agents_path, "w", encoding="utf-8") as f:
-            f.write(agents_md)
-        created_files.append("AGENTS.md")
+    file_contents["AGENTS.md"] = agents_md
 
     # 2. docs/ARCHITECTURE_MAP.md
     arch_md = f"""# {project_name} — Architecture Map
 
-**Last Updated**: {scan_data.get('date', 'Initial Scaffolding')}
+**Last Verified**: [UNVERIFIED — Pending Initial Acceptance Audit]  
 **Purpose**: Authoritative map of how systems, services, and data flows are wired in reality.
 
-## 1. System Topology
+## 1. Discovered System Components (Evidence-Based)
 
-- **Primary Stack**: {', '.join(scan_data['languages']) or 'Polyglot'}
-- **Application Services**: {', '.join(scan_data['frameworks']) or 'Standard'}
-- **Persistence & Caching**: {', '.join(scan_data['databases']) or 'Standard'}
-- **Containerization**: {'Docker / Compose enabled' if scan_data['has_docker'] else 'Native host'}
+{evidence_repr}
 
-## 2. Directory Map
+## 2. Top-Level Directory Layout (Discovered on Disk)
 
 ```
-docs/           Authoritative dossiers and runbooks
-src/            Application core source code
-tests/          Automated regression and acceptance suites
-scripts/        Operational automation and diagnostic tools
+{dirs_repr}
 ```
 
-## 3. Service Boundaries & Data Flow
+## 3. Service Boundaries & Communication
 
-Describe core subsystem boundaries and external integrations here.
+- Document service-to-service communication, RPC/REST boundaries, and database ownership here.
+- [TODO: VERIFY] Confirm whether message queues (Celery, Redis, RabbitMQ) or external third-party APIs are active.
 """
-    arch_path = os.path.join(docs_dir, "ARCHITECTURE_MAP.md")
-    if not os.path.exists(arch_path):
-        with open(arch_path, "w", encoding="utf-8") as f:
-            f.write(arch_md)
-        created_files.append("docs/ARCHITECTURE_MAP.md")
+    file_contents["docs/ARCHITECTURE_MAP.md"] = arch_md
 
     # 3. docs/CURRENT_STATE.md
     state_md = f"""# {project_name} — Current State (Honest Inventory)
 
-**Purpose**: Truthful ledger of what works, what is broken, and what is stubbed. Never fake status.
+**Principle**: Truthful ledger of verified vs unverified capabilities. Never fabricate feature health.
 
-## 1. Component Status Summary
+## 1. Component Readiness Ledger
 
-| Area | Status | Known Limitations / Notes |
+| Component / Subsystem | Status | Verification Evidence / Actionable TODO |
 |---|---|---|
-| Core Backend | Healthy | Fully operational |
-| Database | Configured | Migrations tracked in Git |
-| Background Jobs | Operational | Idempotent worker execution |
-| Public API | Active | Versioned endpoints |
+| Core Application Backend | **DETECTED** | Found manifests ({', '.join(scan_data['frameworks']) or 'Standard'}); runtime health **UNVERIFIED** until tests pass. |
+| Database Persistence | **{'DETECTED' if scan_data['databases'] else 'UNKNOWN'}** | {', '.join(scan_data['databases']) if scan_data['databases'] else 'None detected'}; schema migration status **UNVERIFIED**. |
+| Background Task Queue | **{'DETECTED' if 'Redis' in scan_data['databases'] else 'UNKNOWN'}** | Worker daemon status and idempotency **UNVERIFIED**. |
+| Public API Endpoints | **DETECTED** | Route declarations exist; live HTTP contract responses **UNVERIFIED**. |
+| Automated Test Suite | **{'DETECTED' if scan_data['testing_tools'] else 'UNVERIFIED'}** | Runner: {', '.join(scan_data['testing_tools']) if scan_data['testing_tools'] else 'None configured'}; run test suite to verify pass rate. |
 
-## 2. Known Issues & Tech Debt
+**Status Definitions**:
+- `DETECTED`: Files or configurations exist in repository, but live behavior is unverified.
+- `VERIFIED`: Confirmed operational via automated test execution or live smoke checks.
+- `UNVERIFIED`: Detected but currently lacking passing verification evidence.
+- `UNKNOWN`: Cannot be determined from static repository inspection.
+- `NOT_APPLICABLE`: Explicitly excluded or not part of this service.
 
-- Record known flaky tests, edge-case race conditions, or pending refactors here.
+## 2. Active Technical Debt & Known Gaps
+
+- [TODO: VERIFY] Execute repository test harness and record baseline pass rate.
+- [TODO: VERIFY] Check whether active migrations match database state.
 """
-    state_path = os.path.join(docs_dir, "CURRENT_STATE.md")
-    if not os.path.exists(state_path):
-        with open(state_path, "w", encoding="utf-8") as f:
-            f.write(state_md)
-        created_files.append("docs/CURRENT_STATE.md")
+    file_contents["docs/CURRENT_STATE.md"] = state_md
 
     # 4. docs/MASTER_BACKLOG.md
     backlog_md = f"""# {project_name} — Master Backlog
@@ -242,39 +268,31 @@ Describe core subsystem boundaries and external integrations here.
 
 ## Active Sprint
 
-| ID | Priority | Title | Assignee | Acceptance Criteria |
-|---|---|---|---|---|
-| BL-001 | P0 | Project onboarding & baseline verification | Agent / Team | Tests pass, CI green |
-| BL-002 | P1 | Establish core test suite and regression coverage | Agent | Unit test coverage > 80% |
+| ID | Priority | Title | Assignee | Acceptance Criteria | Status |
+|---|---|---|---|---|---|
+| BL-001 | P0 | Baseline verification & test suite execution | Agent / Team | All existing unit tests pass cleanly | UNVERIFIED |
+| BL-002 | P1 | Audit dependencies and security posture | Agent | Zero vulnerable direct dependencies | PENDING |
 
 ## Icebox / Future Work
 - BL-003: Performance profiling and query optimization
 """
-    backlog_path = os.path.join(docs_dir, "MASTER_BACKLOG.md")
-    if not os.path.exists(backlog_path):
-        with open(backlog_path, "w", encoding="utf-8") as f:
-            f.write(backlog_md)
-        created_files.append("docs/MASTER_BACKLOG.md")
+    file_contents["docs/MASTER_BACKLOG.md"] = backlog_md
 
     # 5. docs/AGENT_ROUTING.md
     routing_md = f"""# {project_name} — Agent Routing Guide
 
-**Purpose**: Directs each category of task to the AI agent or human role best equipped to solve it safely.
+**Purpose**: Directs tasks to the appropriate model or human role based on task risk and reasoning requirements.
 
-| Task Category | Recommended Model / Role | Rationale |
-|---|---|---|
-| Scoped backend bugfix (1-3 files) | **Codex / Lightweight Agent** | Fast, deterministic code editing with clear unit test acceptance |
-| Architecture & multi-service design | **Claude / Gemini Pro / Lead** | High context window synthesis and trade-off evaluation |
-| Database schema migrations | **Agent + Human Review** | Low tolerance for data risk; requires explicit migration review |
-| UI/UX Component Refactoring | **Frontend Specialist Agent** | Visual polish, responsiveness, accessibility standards |
-| Production deployment & rollback | **Guarded CLI / Human** | Irreversible state mutation; must follow runbook strictly |
-| Secret rotation & credentials | **Human Operator Only** | Agents must never view or store production secrets |
+| Task Category | Recommended Model / Role | Rationale | Risk Profile |
+|---|---|---|---|
+| Scoped backend bugfix (1-3 files) | **Codex / Lightweight Agent** | Fast, deterministic code editing with clear unit test acceptance criteria. | Low |
+| Architecture & multi-service design | **Claude / Gemini Pro / Lead** | Large context window synthesis and trade-off evaluation. | Medium |
+| Database schema migrations | **Agent Drafting + Human Review** | Low tolerance for data corruption; requires explicit human review. | High |
+| UI/UX Component Polish | **Frontend Specialist Agent** | Visual polish, responsiveness, accessibility standards. | Low |
+| Production deployment & rollback | **Guarded CLI / Human Operator** | Mutating live production state; strictly follow guarded runbooks. | High |
+| Secret rotation & credentials | **Human Operator ONLY** | AI agents must never view, generate, or touch production secret keys. | Critical |
 """
-    routing_path = os.path.join(docs_dir, "AGENT_ROUTING.md")
-    if not os.path.exists(routing_path):
-        with open(routing_path, "w", encoding="utf-8") as f:
-            f.write(routing_md)
-        created_files.append("docs/AGENT_ROUTING.md")
+    file_contents["docs/AGENT_ROUTING.md"] = routing_md
 
     # 6. docs/PRODUCTION_RUNBOOK.md
     prod_md = f"""# {project_name} — Production Runbook
@@ -288,28 +306,24 @@ Describe core subsystem boundaries and external integrations here.
 
 ## 2. Deployment Commands
 ```bash
-# Example deployment command
+# Example deployment command (customize for your target infrastructure):
 git pull origin main
 # Rebuild containers or dependencies if needed
 ```
 
 ## 3. Post-Deployment Verification
 ```bash
-# Verify health endpoint returns 200 OK
+# Verify health endpoint returns 200 OK:
 curl -f https://example.com/healthz
 ```
 
 ## 4. Rollback Protocol
-If health checks fail, revert to previous stable release tag:
+If health checks fail, revert to previous stable release commit:
 ```bash
 git checkout <PREVIOUS_COMMIT>
 ```
 """
-    prod_path = os.path.join(docs_dir, "PRODUCTION_RUNBOOK.md")
-    if not os.path.exists(prod_path):
-        with open(prod_path, "w", encoding="utf-8") as f:
-            f.write(prod_md)
-        created_files.append("docs/PRODUCTION_RUNBOOK.md")
+    file_contents["docs/PRODUCTION_RUNBOOK.md"] = prod_md
 
     # 7. docs/INCIDENT_RUNBOOK.md
     inc_md = f"""# {project_name} — Incident Runbook & Post-Mortem Ledger
@@ -324,11 +338,7 @@ git checkout <PREVIOUS_COMMIT>
 - **Remedy**: Added pinned dependency to manifest and rebuilt image.
 - **Permanent Guard**: Pre-deploy test suite now validates manifest imports.
 """
-    inc_path = os.path.join(docs_dir, "INCIDENT_RUNBOOK.md")
-    if not os.path.exists(inc_path):
-        with open(inc_path, "w", encoding="utf-8") as f:
-            f.write(inc_md)
-        created_files.append("docs/INCIDENT_RUNBOOK.md")
+    file_contents["docs/INCIDENT_RUNBOOK.md"] = inc_md
 
     # 8. docs/BUILD_DEPLOY_MATRIX.md
     matrix_md = f"""# {project_name} — Build & Deploy Matrix
@@ -343,16 +353,33 @@ git checkout <PREVIOUS_COMMIT>
 | Frontend Assets | Build bundle | — | — | Web |
 | Documentation only (`docs/`, `*.md`) | — | — | — | None |
 """
-    matrix_path = os.path.join(docs_dir, "BUILD_DEPLOY_MATRIX.md")
-    if not os.path.exists(matrix_path):
-        with open(matrix_path, "w", encoding="utf-8") as f:
-            f.write(matrix_md)
-        created_files.append("docs/BUILD_DEPLOY_MATRIX.md")
+    file_contents["docs/BUILD_DEPLOY_MATRIX.md"] = matrix_md
 
-    return created_files
+    # Write or preview files safely
+    for rel_path, content in file_contents.items():
+        # Prevent path traversal
+        target_abs = os.path.realpath(os.path.join(path, rel_path))
+        if not target_abs.startswith(path):
+            raise PermissionError(f"Security violation: Target path '{target_abs}' escapes project root '{path}'.")
+
+        if os.path.exists(target_abs) and not force:
+            skipped_files.append(rel_path)
+            continue
+
+        if not dry_run:
+            os.makedirs(os.path.dirname(target_abs), exist_ok=True)
+            with open(target_abs, "w", encoding="utf-8") as f:
+                f.write(content)
+        created_files.append(rel_path)
+
+    return {
+        "dry_run": dry_run,
+        "created_files": created_files,
+        "skipped_files": skipped_files
+    }
 
 def audit_dossier(path: str) -> Dict[str, Any]:
-    path = os.path.abspath(path)
+    path = os.path.realpath(path)
     issues = []
     missing_dossiers = []
 
@@ -361,7 +388,6 @@ def audit_dossier(path: str) -> Dict[str, Any]:
         if not os.path.exists(target):
             missing_dossiers.append({"file": rel_path, "description": desc})
 
-    # Link checking across all markdown files in root & docs/
     broken_links = []
     secret_findings = []
 
@@ -380,12 +406,10 @@ def audit_dossier(path: str) -> Dict[str, Any]:
             with open(md_file, "r", encoding="utf-8", errors="replace") as fh:
                 content = fh.read()
 
-            # Check links
             for match in link_pattern.finditer(content):
                 url = match.group(2).strip()
                 if url.startswith(("http://", "https://", "mailto:", "#")):
                     continue
-                # Split anchor
                 clean_target = url.split("#")[0]
                 if clean_target:
                     target_full = os.path.normpath(os.path.join(os.path.dirname(md_file), clean_target))
@@ -395,7 +419,6 @@ def audit_dossier(path: str) -> Dict[str, Any]:
                             "target": url
                         })
 
-            # Check secret leaks
             for pat, desc in SECRET_SCAN_PATTERNS:
                 if re.search(pat, content):
                     secret_findings.append({
@@ -429,6 +452,8 @@ def main():
     gen_parser = subparsers.add_parser("generate", help="Scaffold 8-dossier agent onboarding framework")
     gen_parser.add_argument("--path", default=".", help="Target repository root path")
     gen_parser.add_argument("--project-name", default="Project", help="Human-readable project name")
+    gen_parser.add_argument("--dry-run", action="store_true", help="Preview generated files without writing to disk")
+    gen_parser.add_argument("--force", action="store_true", help="Overwrite existing dossier files")
     gen_parser.add_argument("--json", action="store_true", help="Output pure JSON")
 
     # Subcommand: audit-dossier
@@ -449,17 +474,22 @@ def main():
             print(f"Databases:   {', '.join(res['databases']) or 'None detected'}")
             print(f"Docker:      {'Yes' if res['has_docker'] else 'No'}")
             print(f"Dossier Coverage: {res['dossier_coverage_pct']}% ({len(res['existing_dossiers'])}/{len(DOSSIER_FILES)})")
+            if res["evidence"]:
+                print("\nDetection Evidence:")
+                for ev in res["evidence"]:
+                    print(f"  + {ev}")
 
     elif args.subcommand == "generate":
-        created = generate_dossier(args.path, project_name=args.project_name)
+        gen_res = generate_dossier(args.path, project_name=args.project_name, dry_run=args.dry_run, force=args.force)
         if args.json:
-            print(json.dumps({"created_files": created}, indent=2))
+            print(json.dumps(gen_res, indent=2))
         else:
-            print(f"=== Generated {len(created)} Dossier Files ===")
-            for c in created:
-                print(f"  + {c}")
-            if not created:
-                print("All standard dossier files already exist.")
+            prefix = "[DRY-RUN] " if gen_res["dry_run"] else ""
+            print(f"=== {prefix}Scaffolding Dossier for '{args.project_name}' ===")
+            for c in gen_res["created_files"]:
+                print(f"  + Created: {c}")
+            for s in gen_res["skipped_files"]:
+                print(f"  ~ Skipped existing: {s} (use --force to overwrite)")
 
     elif args.subcommand == "audit-dossier":
         audit_res = audit_dossier(args.path)

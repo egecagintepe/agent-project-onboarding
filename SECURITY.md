@@ -15,3 +15,4 @@ If you discover a security flaw, secret scanner evasion, or path traversal vulne
 3. Include reproduction steps.
 
 We will acknowledge receipt within 48 hours.
+
