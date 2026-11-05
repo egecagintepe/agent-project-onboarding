@@ -146,7 +146,7 @@ All 8 dossiers exist, links resolve, and no secrets detected.
 
 Assign tasks to AI agents with zero ambiguity using the standardized brief:
 
-```markdown
+````markdown
 ## Task: <TITLE>
 
 **Context**: docs/CURRENT_STATE.md §<section>
@@ -170,7 +170,7 @@ Assign tasks to AI agents with zero ambiguity using the standardized brief:
 ```bash
 python -m unittest tests/test_file_a.py
 ```
-```
+````
 
 ---
 
@@ -198,7 +198,7 @@ python -m unittest tests/test_file_a.py
 
 ## Testing
 
-Run the full automated test suite (14 tests):
+Run the full automated test suite (24 tests):
 ```bash
 python -m unittest discover -s tests
 ```

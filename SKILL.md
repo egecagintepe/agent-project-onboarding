@@ -42,7 +42,7 @@ Every on-boarded project maintains a standardized documentation bundle:
 
 When assigning tasks to an agent, use the standardized brief template to prevent hallucinations and scope creep:
 
-```markdown
+````markdown
 ## Task: <TITLE>
 
 **Context**: docs/CURRENT_STATE.md §<section>
@@ -67,7 +67,7 @@ When assigning tasks to an agent, use the standardized brief template to prevent
 ```bash
 python -m unittest tests/test_target.py
 ```
-```
+````
 
 ---
 

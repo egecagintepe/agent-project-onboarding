@@ -31,6 +31,45 @@ SECRET_SCAN_PATTERNS = [
     (r"xox[baprs]-[0-9a-zA-Z-]{10,}", "Slack Token")
 ]
 
+def validate_safe_target_path(base_dir: str, rel_path: str) -> str:
+    """
+    Validates that resolving rel_path against base_dir stays strictly inside base_dir.
+    Rejects:
+    - Path traversal attempts (e.g., '../outside')
+    - Sibling directory prefix collisions (e.g. '/tmp/repo-evil' when base is '/tmp/repo')
+    - Symlinks that escape project boundaries
+    - Direct symlink paths to protect against link hijacking
+    """
+    base_abs = os.path.abspath(base_dir)
+    base_real = os.path.realpath(base_abs)
+
+    target_abs = os.path.abspath(os.path.join(base_abs, rel_path))
+
+    # Path boundary check via commonpath (prevents sibling prefix collisions like /repo vs /repo-evil)
+    try:
+        common = os.path.commonpath([base_abs, target_abs])
+    except ValueError:
+        raise PermissionError(f"Security violation: Target '{target_abs}' is on a different drive than base '{base_abs}'.")
+
+    if common != base_abs:
+        raise PermissionError(f"Security violation: Target path '{target_abs}' escapes project root '{base_abs}'.")
+
+    # Reject symlinks on the target itself
+    if os.path.islink(target_abs):
+        raise PermissionError(f"Security violation: Symlink target '{target_abs}' is not permitted.")
+
+    # Check that realpath (after resolving intermediate symlinks) stays within real project root
+    target_real = os.path.realpath(target_abs)
+    try:
+        common_real = os.path.commonpath([base_real, target_real])
+    except ValueError:
+        raise PermissionError(f"Security violation: Target '{target_real}' is on a different drive than base '{base_real}'.")
+
+    if common_real != base_real:
+        raise PermissionError(f"Security violation: Symlink target '{target_real}' escapes project root '{base_real}'.")
+
+    return target_abs
+
 def scan_project(path: str) -> Dict[str, Any]:
     path = os.path.realpath(path)
     if not os.path.isdir(path):
@@ -57,9 +96,27 @@ def scan_project(path: str) -> Dict[str, Any]:
     databases = []
     testing_tools = []
     evidence = []
+    task_queues = []
+    has_api = False
+    api_evidence = []
     has_docker = False
 
     file_set = set(files)
+    test_files_count = sum(1 for f in files if f.startswith(("tests/", "test/")) or f.endswith(("_test.py", "test_.py", ".test.js", ".test.ts", ".spec.ts", ".spec.js")))
+
+    # Routes / API files check
+    if any(f in file_set for f in ["urls.py", "routes.py", "api.py", "openapi.json", "openapi.yaml", "openapi.yml", "swagger.yaml", "swagger.json", "swagger.yml"]):
+        has_api = True
+        api_evidence.append("Found API manifest or routing declaration file")
+    if any(f.startswith(("routes/", "controllers/", "api/", "endpoints/")) for f in files):
+        has_api = True
+        api_evidence.append("Found routes/controllers/api directory")
+
+    # Celery / Task queue files check
+    if any(f.endswith("celery.py") or f.endswith("tasks.py") or "/tasks/" in f for f in files):
+        if "Celery" not in task_queues:
+            task_queues.append("Celery")
+            evidence.append("Celery: Found celery.py or tasks.py")
 
     # 1. Languages with evidence
     if any(f.endswith(".py") for f in files) or "requirements.txt" in file_set or "pyproject.toml" in file_set:
@@ -123,8 +180,21 @@ def scan_project(path: str) -> Dict[str, Any]:
                         if "jest" in content and "jest" not in testing_tools:
                             testing_tools.append("jest")
                             evidence.append(f"jest: Referenced in {f}")
+                        if "celery" in content and "Celery" not in task_queues:
+                            task_queues.append("Celery")
+                            evidence.append(f"Celery: Mentioned in {f}")
+                        if "bullmq" in content and "BullMQ" not in task_queues:
+                            task_queues.append("BullMQ")
+                            evidence.append(f"BullMQ: Mentioned in {f}")
+                        if ("urlpatterns" in content or "app.get(" in content or "app.post(" in content or "router.get(" in content or "apirouter" in content) and not has_api:
+                            has_api = True
+                            api_evidence.append(f"API routing patterns discovered in {f}")
             except Exception:
                 pass
+
+    if ("FastAPI" in frameworks or "Express" in frameworks or "Django" in frameworks) and not has_api:
+        has_api = True
+        api_evidence.append(f"Web framework routing conventions ({', '.join(f for f in frameworks if f in ('FastAPI', 'Express', 'Django'))})")
 
     if any("dockerfile" in f.lower() for f in files) or any("docker-compose" in f.lower() for f in files):
         has_docker = True
@@ -142,6 +212,10 @@ def scan_project(path: str) -> Dict[str, Any]:
         "frameworks": frameworks,
         "databases": databases,
         "testing_tools": testing_tools,
+        "task_queues": task_queues,
+        "has_api": has_api,
+        "api_evidence": api_evidence,
+        "test_files_count": test_files_count,
         "has_docker": has_docker,
         "top_level_directories": sorted(list(top_level_dirs)),
         "evidence": evidence,
@@ -233,6 +307,51 @@ To avoid context saturation and instruction dilution, inspect documents in this 
     file_contents["docs/ARCHITECTURE_MAP.md"] = arch_md
 
     # 3. docs/CURRENT_STATE.md
+    if scan_data["frameworks"]:
+        backend_status = "DETECTED"
+        backend_evidence = f"Found framework manifests ({', '.join(scan_data['frameworks'])}); runtime health **UNVERIFIED** until tests pass."
+    elif scan_data["languages"]:
+        backend_status = "DETECTED"
+        backend_evidence = f"Found language manifests ({', '.join(scan_data['languages'])}); framework and runtime health **UNVERIFIED**."
+    else:
+        backend_status = "UNKNOWN"
+        backend_evidence = "No backend language or framework manifests detected."
+
+    if scan_data["databases"]:
+        db_status = "DETECTED"
+        db_evidence = f"{', '.join(scan_data['databases'])}; schema migration status **UNVERIFIED**."
+    else:
+        db_status = "UNKNOWN"
+        db_evidence = "No database driver or manifest references detected."
+
+    if scan_data.get("task_queues"):
+        queue_status = "DETECTED"
+        queue_evidence = f"{', '.join(scan_data['task_queues'])}; worker daemon status and idempotency **UNVERIFIED**."
+    elif "Redis" in scan_data["databases"]:
+        queue_status = "UNVERIFIED"
+        queue_evidence = "Redis detected (cache/broker); worker queue integration unverified."
+    else:
+        queue_status = "UNKNOWN"
+        queue_evidence = "No background worker or queue configuration detected."
+
+    if scan_data.get("has_api"):
+        api_status = "DETECTED"
+        api_details = "; ".join(scan_data.get("api_evidence", ["Route declarations exist"]))
+        api_evidence = f"Route declarations exist ({api_details}); live HTTP contract responses **UNVERIFIED**."
+    else:
+        api_status = "UNKNOWN"
+        api_evidence = "No API routes, controllers, or OpenAPI specifications detected."
+
+    if scan_data["testing_tools"]:
+        test_status = "DETECTED"
+        test_evidence = f"Runner: {', '.join(scan_data['testing_tools'])}; run test suite to verify pass rate."
+    elif scan_data.get("test_files_count", 0) > 0:
+        test_status = "UNVERIFIED"
+        test_evidence = f"Found {scan_data['test_files_count']} test files but runner configuration unverified; execute harness to confirm."
+    else:
+        test_status = "UNKNOWN"
+        test_evidence = "No automated test runner or test suite detected."
+
     state_md = f"""# {project_name} — Current State (Honest Inventory)
 
 **Principle**: Truthful ledger of verified vs unverified capabilities. Never fabricate feature health.
@@ -241,11 +360,11 @@ To avoid context saturation and instruction dilution, inspect documents in this 
 
 | Component / Subsystem | Status | Verification Evidence / Actionable TODO |
 |---|---|---|
-| Core Application Backend | **DETECTED** | Found manifests ({', '.join(scan_data['frameworks']) or 'Standard'}); runtime health **UNVERIFIED** until tests pass. |
-| Database Persistence | **{'DETECTED' if scan_data['databases'] else 'UNKNOWN'}** | {', '.join(scan_data['databases']) if scan_data['databases'] else 'None detected'}; schema migration status **UNVERIFIED**. |
-| Background Task Queue | **{'DETECTED' if 'Redis' in scan_data['databases'] else 'UNKNOWN'}** | Worker daemon status and idempotency **UNVERIFIED**. |
-| Public API Endpoints | **DETECTED** | Route declarations exist; live HTTP contract responses **UNVERIFIED**. |
-| Automated Test Suite | **{'DETECTED' if scan_data['testing_tools'] else 'UNVERIFIED'}** | Runner: {', '.join(scan_data['testing_tools']) if scan_data['testing_tools'] else 'None configured'}; run test suite to verify pass rate. |
+| Core Application Backend | **{backend_status}** | {backend_evidence} |
+| Database Persistence | **{db_status}** | {db_evidence} |
+| Background Task Queue | **{queue_status}** | {queue_evidence} |
+| Public API Endpoints | **{api_status}** | {api_evidence} |
+| Automated Test Suite | **{test_status}** | {test_evidence} |
 
 **Status Definitions**:
 - `DETECTED`: Files or configurations exist in repository, but live behavior is unverified.
@@ -357,10 +476,8 @@ git checkout <PREVIOUS_COMMIT>
 
     # Write or preview files safely
     for rel_path, content in file_contents.items():
-        # Prevent path traversal
-        target_abs = os.path.realpath(os.path.join(path, rel_path))
-        if not target_abs.startswith(path):
-            raise PermissionError(f"Security violation: Target path '{target_abs}' escapes project root '{path}'.")
+        # Validate path boundary, reject sibling collisions and symlink escapes
+        target_abs = validate_safe_target_path(path, rel_path)
 
         if os.path.exists(target_abs) and not force:
             skipped_files.append(rel_path)

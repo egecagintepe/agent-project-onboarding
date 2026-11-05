@@ -6,7 +6,7 @@ Here are production-tested task briefs illustrating the standard handoff format.
 
 ## Example 1: Scoped Backend Bugfix
 
-```markdown
+````markdown
 ## Task: BL-042 — Handle Redis Connection Outage Gracefully in Schedule View
 
 **Context**: docs/MASTER_BACKLOG.md §BL-042, docs/INCIDENT_RUNBOOK.md §Incident 009
@@ -32,13 +32,13 @@ When Redis is temporarily unreachable, accessing `/api/v1/schedules/` raises an 
 ```bash
 python -m unittest tests/test_schedules.py
 ```
-```
+````
 
 ---
 
 ## Example 2: Database Migration with Safe Defaults
 
-```markdown
+````markdown
 ## Task: BL-051 — Add 'last_login_ip' to User Model
 
 **Context**: docs/ARCHITECTURE_MAP.md §Users, docs/BUILD_DEPLOY_MATRIX.md
@@ -66,5 +66,5 @@ We need to track user login IP addresses for security auditing without locking t
 python manage.py makemigrations --check --dry-run
 python manage.py test tests.test_user_model
 ```
-```
+````
 

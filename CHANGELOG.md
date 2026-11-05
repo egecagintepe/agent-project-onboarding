@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-11-05
+
+### Security & Hardening
+- **Path Boundary Validation & Sibling Collision Defense**: Replaced naive `target.startswith(base)` containment with strict `os.path.commonpath` boundary validation. Resolves sibling-directory prefix collision vulnerabilities (e.g. `/path/repo` vs `/path/repo-evil`) and enforces symlink escape rejection.
+- **Evidence-Conditioned Component Readiness**: Component statuses (including Public API Endpoints, Databases, Queues, and Test Suites) are now marked `DETECTED` strictly when concrete evidence exists in the repository; otherwise they default honestly to `UNKNOWN`.
+- **Markdown Code Fence Nesting**: Fixed outer code fence formatting in documentation and examples (`README.md`, `SKILL.md`, `task_brief_examples.md`) using 4-backtick blocks so inner code blocks render cleanly.
+- **Regression Test Coverage**: Expanded automated test suite to 24 tests, adding coverage for sibling directory prefix collisions, symlink escape rejection, and evidence-conditioned component ledger generation.
+
 ## [1.0.1] - 2026-11-05
 
 ### Security & Hardening
