@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-11-05
+
+### Added
+- **Authentic Terminal Recording & Demo Assets**: Added live terminal recording (`assets/demo.gif` and `assets/demo.mp4`) demonstrating CLI scanning, dry-run preview, non-destructive scaffolding, and dossier auditing.
+- **Synthetic Microservice Showcase**: Added realistic synthetic FastAPI + PostgreSQL + Celery service (`examples/synthetic_shop_api/`) with zero secrets or proprietary code.
+- **Reproducible Walkthrough**: Added `examples/demo_walkthrough.md` with step-by-step authentic command invocations and outputs.
+- **Developer Experience & FAQ**: Enhanced README with verified `skills.sh` discoverability badge, Problem → Solution → Result narrative, prominent install command, and developer FAQ.
+
 ## [1.0.2] - 2026-11-05
 
 ### Security & Hardening

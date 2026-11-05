@@ -5,64 +5,106 @@
 **Give every new AI coding agent the project context it actually needs.**
 
 [![CI](https://github.com/egecagintepe/agent-project-onboarding/actions/workflows/ci.yml/badge.svg)](https://github.com/egecagintepe/agent-project-onboarding/actions)
+[![Release](https://img.shields.io/github/v/release/egecagintepe/agent-project-onboarding?color=blue)](https://github.com/egecagintepe/agent-project-onboarding/releases/latest)
+[![skills.sh](https://img.shields.io/badge/skills.sh-agent--project--onboarding-blue)](https://skills.sh/egecagintepe/agent-project-onboarding)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 [![Agent Skills: v1](https://img.shields.io/badge/Agent%20Skills-v1.0-emerald.svg)](https://agentskills.io/specification)
 
-*Multi-agent coordination framework and repository handoff protocol. Scans codebases, scaffolds honest 8-dossier contracts (AGENTS.md), and preserves production incident memory across AI agent sessions.*
+*Multi-agent coordination framework and repository handoff protocol. Scans codebases, scaffolds evidence-based 8-dossier contracts (AGENTS.md), and preserves production incident memory across AI agent sessions.*
 
+<br />
+
+```bash
+npx skills add egecagintepe/agent-project-onboarding
 ```
-   [ REPOSITORY ROOT ]
-          │
-          ├── AGENTS.md (Level 1: Universal Constitutional Contract ~ 60 lines)
-          │
-          └── docs/
-               ├── ARCHITECTURE_MAP.md   (Level 2: System Wiring & Service Boundaries)
-               ├── CURRENT_STATE.md      (Level 2: Honest Ledger: DETECTED vs VERIFIED)
-               ├── MASTER_BACKLOG.md     (Level 2: Prioritized Single Source of Truth)
-               ├── AGENT_ROUTING.md      (Level 3: Task Assignment by Risk Profile)
-               ├── PRODUCTION_RUNBOOK.md (Level 3: Deploy & Verification Commands)
-               ├── INCIDENT_RUNBOOK.md   (Level 3: "Happened Once, Never Again" Ledger)
-               └── BUILD_DEPLOY_MATRIX.md(Level 3: Change-to-Action Impact Matrix)
-```
+
+<br />
+
+![Agent Project Onboarding Live Terminal Demo](assets/demo.gif)
 
 </div>
 
 ---
 
-## The Problem
+## Problem → Solution → Result
 
-When engineering teams collaborate with AI coding agents (Claude Code, Cursor, Codex, Gemini, Antigravity) across multiple sessions or tools:
-1. **Context Fragmentation**: Every new agent session starts from zero. Critical rules, conventions, and operational boundaries are lost between prompts.
-2. **Instruction Dilution (Prompt Saturation)**: Dumping 5,000 lines of documentation into an agent's initial prompt burns token budgets and dilutes attention, leading to hallucinations.
-3. **Repeated Regressions**: New agents frequently repeat past production mistakes that were already diagnosed, suffered, and resolved by the team weeks earlier.
-4. **Fabricated Status Reports**: Naive templates report "Core Backend: Healthy" or "Test Coverage: 100%" based on synthetic mocks without verifying live code.
+- **The Problem**: When a developer delegates a task to an AI coding agent (Claude Code, Cursor, Codex, Gemini, Antigravity) in a non-trivial repository:
+  1. **Context Saturation**: Dumping 5,000+ lines of documentation into an agent's initial prompt burns token budgets and dilutes attention, causing hallucinations.
+  2. **Boundary Violations**: Without strict invariants, agents rewrite database schemas destructively, edit out-of-scope files, or bypass local test harnesses.
+  3. **Repeated Regressions**: New agent sessions repeatedly reintroduce bugs that were already diagnosed, suffered, and fixed by the team weeks earlier.
+  4. **Fabricated Health**: Naive templates falsely report "All systems verified" based on synthetic mocks without checking live code.
+
+- **The Solution**: `agent-project-onboarding` provides an automated, zero-dependency CLI that scans codebases, gathers concrete file evidence, and scaffolds an 8-dossier progressive disclosure framework anchored by `AGENTS.md`.
+
+- **The Result**: Agents load fewer than 60 lines of constitutional invariants upfront, consult specialized runbooks only when a task touches that subsystem, follow standardized task briefs, and record lessons in an incident ledger ("Happened Once, Never Again").
 
 ---
 
 ## Quick Install (30 Seconds)
 
-### Using Agent Skills CLI (`skills.sh`)
+### Option 1: Using Agent Skills CLI (`skills.sh`)
 ```bash
 npx skills add egecagintepe/agent-project-onboarding
 ```
 
-### Direct Agent Integration (Claude Code, Cursor, Codex)
+### Option 2: Direct Agent Integration (Claude Code, Cursor, Codex)
+Clone directly into your project's agent skills directory:
 ```bash
 git clone https://github.com/egecagintepe/agent-project-onboarding.git .agents/skills/agent-project-onboarding
 ```
 
-### Standalone CLI Toolkit
+### Option 3: Standalone CLI Toolkit (Zero Dependencies)
 ```bash
 git clone https://github.com/egecagintepe/agent-project-onboarding.git
 cd agent-project-onboarding
+python scripts/onboard_project.py --help
 ```
+
+---
+
+## Live Demo & Synthetic Project
+
+See the reproducible step-by-step walkthrough in [examples/demo_walkthrough.md](examples/demo_walkthrough.md) running against the included synthetic microservice in [examples/synthetic_shop_api/](examples/synthetic_shop_api/).
+
+```
+examples/synthetic_shop_api/
+├── Dockerfile           # Discovered container manifest
+├── main.py              # Discovered FastAPI routing
+├── models.py            # Persistence models
+├── requirements.txt     # PostgreSQL, Redis, Celery, pytest
+├── tasks.py             # Discovered Celery worker tasks
+└── tests/test_main.py   # Discovered test runner
+```
+
+| Step | Action | Authentic Command |
+|---|---|---|
+| **1. Scan** | Detect stack & evidence | `python scripts/onboard_project.py scan --path examples/synthetic_shop_api` |
+| **2. Preview** | Safe dry-run check | `python scripts/onboard_project.py generate --path examples/synthetic_shop_api --dry-run` |
+| **3. Scaffold** | Generate 8 dossiers | `python scripts/onboard_project.py generate --path examples/synthetic_shop_api` |
+| **4. Audit** | Verify links & secrets | `python scripts/onboard_project.py audit-dossier --path examples/synthetic_shop_api` |
+| **5. Protect** | Re-run without overwriting | `python scripts/onboard_project.py generate --path examples/synthetic_shop_api` (skips existing) |
 
 ---
 
 ## The 8-Dossier Architecture
 
 `agent-project-onboarding` establishes a standardized, progressive-disclosure documentation package in any repository:
+
+```
+[ REPOSITORY ROOT ]
+       │
+       ├── AGENTS.md (Level 1: Universal Constitutional Contract ~ 60 lines)
+       │
+       └── docs/
+            ├── ARCHITECTURE_MAP.md   (Level 2: System Wiring & Service Boundaries)
+            ├── CURRENT_STATE.md      (Level 2: Honest Ledger: DETECTED vs VERIFIED)
+            ├── MASTER_BACKLOG.md     (Level 2: Prioritized Single Source of Truth)
+            ├── AGENT_ROUTING.md      (Level 3: Task Assignment by Risk Profile)
+            ├── PRODUCTION_RUNBOOK.md (Level 3: Deploy & Verification Commands)
+            ├── INCIDENT_RUNBOOK.md   (Level 3: "Happened Once, Never Again" Ledger)
+            └── BUILD_DEPLOY_MATRIX.md(Level 3: Change-to-Action Impact Matrix)
+```
 
 | # | Dossier | File Path | Purpose |
 |---|---|---|---|
@@ -98,22 +140,6 @@ Recursively inspects codebases to detect languages, frameworks, databases, and e
 
 ```bash
 python scripts/onboard_project.py scan --path /path/to/project
-```
-
-Output:
-```text
-=== Project Scan: /path/to/project ===
-Languages:   Python, TypeScript
-Frameworks:  Django, React
-Databases:   PostgreSQL, Redis
-Docker:      Yes
-Dossier Coverage: 0.0% (0/8)
-
-Detection Evidence:
-  + Python: Detected .py files or Python dependency manifests
-  + Django: Found 'manage.py' in repository root
-  + PostgreSQL: Referenced in requirements.txt
-  + Docker: Found Dockerfile or docker-compose file
 ```
 
 ### 2. Scaffold Onboarding Dossiers
@@ -174,6 +200,22 @@ python -m unittest tests/test_file_a.py
 
 ---
 
+## Frequently Asked Questions (FAQ)
+
+### Will running `generate` overwrite my existing documentation?
+**No.** By default, `generate` is non-destructive. If `AGENTS.md` or any file in `docs/` already exists, the CLI skips it with a warning. You must pass `--force` explicitly to overwrite existing files.
+
+### Does this tool send any telemetry or require network access?
+**No.** `onboard_project.py` is written entirely with the Python standard library. It makes zero outbound network requests and stores no external data.
+
+### How does the tool protect against path traversal and symlink attacks?
+Target paths are validated using `os.path.commonpath([base, target]) == base`. Sibling directory prefix collisions (e.g. `/path/repo-evil` when the project is `/path/repo`), parent traversal (`../`), and symlink escapes pointing outside the project root are rejected with a `PermissionError`.
+
+### Which AI coding agents support this protocol?
+The 8-dossier structure adheres to the open [Agent Skills Specification](https://agentskills.io/specification). It works out of the box with Claude Code, Cursor, Codex, Gemini CLI, Antigravity, and any agent capable of reading `AGENTS.md` and `SKILL.md`.
+
+---
+
 ## Deep Documentation
 
 - [Agent Contract Specification (`AGENTS.md`)](references/agent_contract_standard.md) — Constitutional rules
@@ -182,6 +224,7 @@ python -m unittest tests/test_file_a.py
 - [Incident Ledger Methodology](references/incident_ledger_standard.md) — Post-mortem ledger standard
 - [Standard Task Brief Format](references/task_brief_standard.md) — Bounded prompt handoff specification
 - [Sample Task Briefs](examples/task_brief_examples.md) — Real-world prompt examples
+- [Reproducible Walkthrough](examples/demo_walkthrough.md) — Synthetic shop API case study
 
 ---
 
